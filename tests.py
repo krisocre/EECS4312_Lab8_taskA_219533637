@@ -5,7 +5,7 @@ from datetime import date, datetime, time, timedelta
 from solution import TimeWindow, BusyInterval, Slot, suggest_slots
 
 
-# ---------- Helpers ----------
+# ---------- Helpers -----------
 
 def combine(d: date, t: time) -> datetime:
     return datetime.combine(d, t)
