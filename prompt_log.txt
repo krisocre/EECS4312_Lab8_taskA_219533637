@@ -1,5 +1,5 @@
-## Student Name:
-## Student ID: 
+## Student Name: MHD-Oubai Al-khimi
+## Student ID: 219 533 637
 
 Prompt #1: {"Problem Summary
 The objective is to build a Python module that can calculate and recommend the next N available appointment slots. The module should intelligently evaluate a user’s working hours, existing busy periods, and meeting preferences to determine suitable time gaps that meet all scheduling constraints.
