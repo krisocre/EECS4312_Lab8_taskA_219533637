@@ -1,5 +1,5 @@
-## Student Name:
-## Student ID:
+## Student Name: MHD-Oubai Al-khimi
+## Student ID:219 533 637
 
 """
 Task A: Appointment Timeslot Recommender (Stub)
@@ -50,44 +50,23 @@ from typing import List, Optional, Tuple
 
 
 # ---------------- Data Models ----------------
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, time
+from typing import List, Optional
 
 @dataclass(frozen=True)
 class TimeWindow:
-    """
-    A daily time window.
-    Assumption (unless stated otherwise in handout): non-wrapping window where start < end.
-    """
     start: time
     end: time
-
 
 @dataclass(frozen=True)
 class BusyInterval:
-    """
-    A busy interval on the given day.
-    Invariant: start < end
-    """
     start: time
     end: time
 
-
 @dataclass(frozen=True)
 class Slot:
-    """
-    A recommended appointment slot.
-
-    start_time is a time-of-day within the working window.
-    Deterministic ordering: sort by start_time ascending.
-    """
     start_time: time
-
-
-class InfeasibleSchedule(Exception):
-    """Raised when no valid slots can be produced (if required by handout)."""
-    pass
-
-
-# ---------------- Core Function ----------------
 
 def suggest_slots(
     day: date,
@@ -98,31 +77,71 @@ def suggest_slots(
     buffer: timedelta = timedelta(0),
     candidate_window: Optional[TimeWindow] = None
 ) -> List[Slot]:
-    """
-    Suggest up to the next n valid appointment slots (start times) for the given day.
-
-    Args:
-        day: the calendar day for which to suggest slots.
-        working_hours: the allowed working window for meetings (start < end).
-        busy_intervals: list of busy time intervals (may be overlapping / unsorted).
-        duration: required meeting length (must be > 0).
-        n: maximum number of slot suggestions to return (n >= 0).
-        buffer: optional buffer time required between meetings (buffer >= 0).
-        candidate_window: optional extra restriction on suggestions (must lie within this window too).
-
-    Returns:
-        A list of Slot objects, sorted by start_time ascending, deterministic under identical inputs.
-        If no suitable time slots are available, return an empty list.
-
-    Notes:
-        - Suggested slots must fall within working_hours (and candidate_window if provided).
-        - Suggested slots must not overlap busy_intervals, considering buffer time.
-        - You are free to choose internal representation; inputs use time-of-day.
-        - See lab handout for required slot granularity (e.g., 5-min/15-min steps), if any.
-    """
-
-    ##################################################################
-    # TODO: Implement as per lab handout requirements and constraints.
-    ##################################################################
     
-    raise NotImplementedError("suggest_slots has not been implemented yet")
+    if n <= 0:
+        return []
+
+    # 1. Determine the effective search boundaries
+    start_limit = working_hours.start
+    end_limit = working_hours.end
+    
+    if candidate_window:
+        start_limit = max(start_limit, candidate_window.start)
+        end_limit = min(end_limit, candidate_window.end)
+    
+    if start_limit >= end_limit:
+        return []
+
+    # Convert to datetime for easier math
+    search_start = datetime.combine(day, start_limit)
+    search_end = datetime.combine(day, end_limit)
+
+    # 2. Merge and sort busy intervals
+    # We also treat the time before and after the working window as "busy"
+    sorted_busy = sorted(busy_intervals, key=lambda x: x.start)
+    merged_busy: List[Tuple[datetime, datetime]] = []
+    
+    for interval in sorted_busy:
+        b_start = datetime.combine(day, interval.start)
+        b_end = datetime.combine(day, interval.end)
+        
+        if not merged_busy or b_start > merged_busy[-1][1]:
+            merged_busy.append((b_start, b_end))
+        else:
+            # Overlap or adjacency: extend the last interval
+            merged_busy[-1] = (merged_busy[-1][0], max(merged_busy[-1][1], b_end))
+
+    # 3. Sliding Window Search
+    # We use a 5-minute step for suggestions, but this can be adjusted
+    step = timedelta(minutes=5)
+    suggestions = []
+    current_time = search_start
+
+    while current_time + duration <= search_end and len(suggestions) < n:
+        slot_start = current_time
+        slot_end = current_time + duration
+        
+        is_valid = True
+        for b_start, b_end in merged_busy:
+            # A slot is invalid if it overlaps a busy interval OR 
+            # if it violates the buffer zones around that interval.
+            # Effectively: Busy zone is [b_start - buffer, b_end + buffer]
+            effective_b_start = b_start - buffer
+            effective_b_end = b_end + buffer
+            
+            # Check overlap: (StartA < EndB) and (EndA > StartB)
+            if slot_start < effective_b_end and slot_end > effective_b_start:
+                is_valid = False
+                # Optimization: Jump to the end of the busy block's influence
+                current_time = effective_b_end
+                break
+        
+        if is_valid:
+            suggestions.append(Slot(start_time=slot_start.time()))
+            current_time += step
+        else:
+            # If invalid and we didn't already jump, move by the step
+            if current_time == slot_start:
+                current_time += step
+
+    return suggestions
