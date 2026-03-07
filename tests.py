@@ -179,3 +179,64 @@ def test_a5_buffer_eliminates_small_gaps():
 #################################################################################
 # Add your own additional tests here to cover more cases and edge cases as needed.
 #################################################################################
+
+
+def test_candidate_window_end_boundary():
+    day = date(2026, 3, 6)
+    working = TimeWindow(time(9, 0), time(17, 0))
+    candidate = TimeWindow(time(14, 0), time(15, 0)) # Only 1 hour window
+    busy = []
+    duration = timedelta(minutes=45)
+
+    out = suggest_slots(day, working, busy, duration, n=10, candidate_window=candidate)
+
+    # If a meeting starts at 14:15, it ends at 15:00.
+    # If it starts at 14:20, it would end at 15:05 (Invalid).
+    for s in out:
+        start_dt = datetime.combine(day, s.start_time)
+        assert start_dt + duration <= datetime.combine(day, candidate.end)
+
+
+def test_n_limit_and_chronology():
+    day = date(2026, 3, 6)
+    working = TimeWindow(time(9, 0), time(17, 0))
+    busy = []
+    duration = timedelta(minutes=30)
+    n = 3
+    
+    out = suggest_slots(day, working, busy, duration, n=n)
+    
+    assert len(out) == n
+    assert out[0].start_time < out[1].start_time < out[2].start_time
+    assert out[0].start_time == time(9, 0)
+
+
+
+def test_candidate_window_end_boundary():
+    day = date(2026, 3, 6)
+    working = TimeWindow(time(9, 0), time(17, 0))
+    candidate = TimeWindow(time(14, 0), time(15, 0)) # Only 1 hour window
+    busy = []
+    duration = timedelta(minutes=45)
+    
+    out = suggest_slots(day, working, busy, duration, n=10, candidate_window=candidate)
+    
+    # If a meeting starts at 14:15, it ends at 15:00.
+    # If it starts at 14:20, it would end at 15:05 (Invalid).
+    for s in out:
+        start_dt = datetime.combine(day, s.start_time)
+        assert start_dt + duration <= datetime.combine(day, candidate.end)
+
+
+def test_n_limit_and_chronology():
+    day = date(2026, 3, 6)
+    working = TimeWindow(time(9, 0), time(17, 0))
+    busy = []
+    duration = timedelta(minutes=30)
+    n = 3
+    
+    out = suggest_slots(day, working, busy, duration, n=n)
+    
+    assert len(out) == n
+    assert out[0].start_time < out[1].start_time < out[2].start_time
+    assert out[0].start_time == time(9, 0)
