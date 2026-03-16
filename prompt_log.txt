@@ -1,7 +1,7 @@
 ## Student Name: MHD-Oubai Al-khimi
 ## Student ID: 219 533 637
 
-Prompt 1: "System Description: I am building a Python-based Appointment Slot and Medication Reminder Recommender. The system must manage event registrations, waitlists, and medication reminders.
+Prompt 1: "System Description: I am building a Appointment Slot and Medication Reminder Recommender. The system must manage event registrations, waitlists, and medication reminders.
 
 Personas:
 
