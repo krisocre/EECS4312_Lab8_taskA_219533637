@@ -106,11 +106,27 @@ C7	Persona 1 (Auto-Resolution Need)	AC6	test_priority_conflict_resolution
 
 
 
-Revision Notes
+Revision Notes:
 
+Revision Note 1
+Requirement added: EC7 – Handling simultaneous High-Priority conflicts.
+Reason: During requirement review, the LLM identified that C7 only handled conflicts between different priority levels, not identical ones.
+Action: Triggered by LLM feedback. Added a rule to use TBR1 (alphabetical) as a fallback for identical priority levels.
 
+Revision Note 2
+Requirement updated: C2 – Mandatory logging.
+Reason: The LLM pointed out that Jane (Persona 1) hates information overload, while Mo (Persona 2) needs explanations.
+Action: Triggered by LLM feedback. Modified C2 to specify that explanations are stored in a "Review Log" rather than sent as intrusive pop-up notifications.
 
+Revision Note 3
+Requirement added: C8 – Notification Tiering.
+Reason: To satisfy Persona 1’s (Jane) need for minimal interruption while still providing the transparency required by Persona 2 (Mo).
+Action: Triggered by LLM feedback. Implemented a "Silent Log" for background tasks and "Active Alerts" for high-stakes reminders.
 
+Revision Note 4
+Requirement updated: C7 – Priority Conflict Resolution.
+Reason: LLM noted that two "High Priority" items could still conflict.
+Action: Triggered by LLM feedback. Added a secondary sort rule to ensure the outcome remains deterministic even at the same priority level.
 
 
 
