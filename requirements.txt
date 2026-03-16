@@ -1,0 +1,118 @@
+Input:
+User Registration Requests: Data for signing up for events or joining waitlists.
+
+Medication and Event Details: Specific timing, dosage, or schedule information for reminders.
+
+User Actions and Updates: Real-time inputs like snoozing reminders, canceling registrations, or responding to system suggestions.
+
+System Configuration Rules: Pre-defined constraints for handling conflicts, ties, and waitlist promotions automatically.
+
+Output:
+The system produces automated notifications for medication and event reminders, real-time status updates regarding waitlist promotions, and concise explanations for any automated adjustments, like when a reminder is moved or skipped. It also outputs the final resolved schedule after handling any background conflicts or breaking logic.
+
+Functional Requirements:
+
+1.Automated Conflict Resolution: The system shall automatically resolve scheduling collisions between overlapping reminders without requiring manual user input.
+
+2.Deterministic Tie-Breaking: The system shall use a consistent, deterministic algorithm to order reminders or event registrations when time-stamps or priorities are identical.
+
+3.Waitlist Automation: The system shall automatically promote users from a waitlist to an active registration as soon as a spot becomes available.
+
+4.Change Explanations: The system shall provide a clear, explicit explanation whenever a reminder is moved, skipped, or a waitlist promotion occurs.
+
+5.Notification Throttling: The system shall suppress duplicate notifications and redundant system messages to prevent information overload.
+
+6.User-Initiated Updates: The system shall allow users to manually snooze reminders or cancel existing event registrations.
+
+7.Edge Case Reporting: The system shall explicitly notify the user of any failed requests or boundary-case errors instead of failing silently.
+
+8.Stable Ordering: The system shall maintain a predictable and stable sequence for all reminders and system suggestions across repeated sessions.
+
+9.Decision Transparency: The system shall provide a mechanism for users to review the reasoning behind automated system decisions.
+
+10.Rule Enforcement: The system shall automatically enforce pre-defined registration and medication rules without requiring manual oversight.
+
+New Functional Requirements:
+1.ADD, "Accessibility Compliance": The system shall provide an interface compatible with assistive technologies (like screen readers) to support users with accessibility needs and sensory sensitivities.
+
+2.ADD, "Notification Detail Toggle": The system shall allow users to choose between "Concise" and "Detailed" explanation modes to satisfy both the need for minimal interaction and the need for explicit reasoning.
+
+3.ADD, "Automated Default Execution": The system shall automatically execute a recommended conflict resolution if the user does not respond to a suggestion within a predefined time limit, ensuring the system remains "hands-off."
+
+4.MODIFY, "Change Explanations": The system shall maintain a persistent history log of all automated changes (moved/skipped reminders) that can be reviewed on-demand, rather than just sending them as immediate notifications.
+
+5.MODIFY, "User-Initiated Updates": The system shall ensure that frequent, rapid status updates (like repeated snoozing or last-minute cancellations) do not cause the system to reach an inconsistent or "frozen" state.
+
+Constraints:
+
+C1 Persona: Jane Persona attribute: Predictable and stable ordering of reminders. Attribute type: Need Operationalization: Converted into constraint. Derived Constraint: The system must use a deterministic sorting algorithm (e.g., by ID or alphabetical name) to ensure the same list of reminders always appears in the same order if timestamps are identical. Current support level: Fully supported by Lab 8 system.
+
+C2 Persona: Mo Persona attribute: Experiences stress when outcomes appear arbitrary or unexplained. Attribute type: Behavior Operationalization: Converted into constraint. Derived Constraint: For every automated state change (like a waitlist promotion), the system must generate a log entry or notification explaining the specific rule that triggered the change. Current support level: Partially supported 
+
+C3 Persona: Jane Persona attribute: Receiving too many notifications or duplicate system messages. Attribute type: Pain Point Operationalization: Converted into constraint. Derived Constraint: The system shall implement a notification filter that prevents duplicate alerts for the same event within a 5-minute window. Current support level: Not supported.
+
+C4 Persona: Mo Persona attribute: Explicitly handle edge cases instead of silent failure. Attribute type: Need Operationalization: Converted into constraint. Derived Constraint: The system must return a specific error code or status message if a registration fails due to a conflict, rather than simply ignoring the request. Current support level: Fully supported by Lab 8.
+
+C5 Persona: Jane Persona attribute: Acts quickly and rarely revisits system suggestions. Attribute type: Behavior Operationalization: Narrative only. Derived Constraint: (N/A) Current support level: Not supported 
+
+C6 Persona: Mo Persona attribute: Inconsistent responses across repeated or boundary scenarios. Attribute type: Pain Point Operationalization: Converted into constraint. Derived Constraint: The system must be idempotent, sending the same registration request multiple times should not create duplicate entries or different outcomes. Current support level: Partially supported.
+
+C7 Persona: Jane Persona attribute: Trusts the system to resolve conflicts automatically. Attribute type: Behavior Operationalization: Converted into constraint. Derived Constraint: When two medication reminders overlap, the system must apply a pre-set priority rule (e.g., life-critical vs. optional) to resolve the conflict without prompting the user. Current support level: Not supported.
+
+Acceptance Criteria:
+AC1: Given two event registrations have the exact same timestamp When the system displays the upcoming schedule Then the list is sorted alphabetically by event name to ensure the order is deterministic. Linked Constraint ID(s): C1
+
+AC2: Given a user is promoted from a waitlist to an active registration When the state change is processed by the system Then the system generates a log entry specifying the exact rule that triggered the promotion. Linked Constraint ID(s): C2
+
+AC3: Given a medication reminder has already been triggered When the same reminder event triggers again within a 5-minute window Then the system suppresses the second notification to avoid duplicates. Linked Constraint ID(s): C3
+
+AC4: Given a user attempts to register for an event that has reached maximum capacity When the registration request is submitted Then the system returns a "Capacity Exceeded" error message instead of failing silently. Linked Constraint ID(s): C4
+
+AC5: Given a registration request has already been successfully processed When the user sends the exact same registration request a second time Then the system returns the original confirmation status without creating a duplicate record. Linked Constraint ID(s): C6
+
+AC6: Given two medication reminders are scheduled for the same time and one is marked as "High Priority" When the scheduling conflict occurs Then the system automatically schedules the High Priority reminder first without requiring user confirmation. Linked Constraint ID(s): C7
+
+Edge Cases:
+
+EC1: Description: A registration request is sent for an event where the maximum capacity is set to zero. Linked Constraint ID(s): C4 Covered by Acceptance Criteria ID(s): AC4
+
+EC2: Description: A user sends a cancellation request for a medication reminder that has already been cancelled or does not exist. Linked Constraint ID(s): C6 Covered by Acceptance Criteria ID(s): AC5
+
+EC3: Description: Two reminders trigger at the exact same millisecond, creating a perfect tie for the scheduler. Linked Constraint ID(s): C1 Covered by Acceptance Criteria ID(s): AC1
+
+EC4: Description: The system attempts to promote a user from the waitlist, but the user has already manually cancelled their waitlist entry in the background. Linked Constraint ID(s): C4 Covered by Acceptance Criteria ID(s): AC4
+
+EC5: Description: A high-priority medication reminder and a life-critical event occur simultaneously, both requiring immediate attention. Linked Constraint ID(s): C7 Covered by Acceptance Criteria ID(s): AC6
+
+EC6: Description: The user triggers the "Snooze" command repeatedly to test system stability and notification flooding. Linked Constraint ID(s): C3, C6 Covered by Acceptance Criteria ID(s): AC3, AC5
+
+
+Tie‑Breaking Rules:
+Rule ID: TBR1 Scenario: Two reminders occur at the same timestamp. Tie Condition: Both reminders satisfy all scheduling constraints and have the same priority level. Decision Rule: The system must order reminders alphabetically by the medication or event name. Example: If reminders for "Advil" and "B12 Vitamin" occur at 09:00, the system lists Advil first.
+
+Rule ID: TBR2 Scenario: Multiple users are eligible for a single open spot from the waitlist. Tie Condition: All users joined the waitlist at the exact same timestamp (during a bulk system import). Decision Rule: The system must promote the user with the lowest numerical User ID first. Example: If User 105 and User 210 both joined at 10:00:00, User 105 is promoted.
+
+Rule ID: TBR3 Scenario: A medication reminder and a general event registration notification conflict. Tie Condition: Both are scheduled for the same time and neither has a "High Priority" flag. Decision Rule: The system must prioritize the medication reminder over the general event. Example: A "Take Insulin" reminder will always be displayed above a "Yoga Class" registration notification if they share a timestamp.
+
+Traceability Table:
+
+Constraint ID	Derived From Where	Linked AC IDs	Linked Test Name(s)
+C1	Persona 1 & 2 (Predictability Need)	AC1	test_deterministic_sort_order
+C2	Persona 2 (Explanation Need)	AC2	test_waitlist_promotion_logging
+C3	Persona 1 (Notification Pain Point)	AC3	test_notification_suppression_window
+C4	Persona 2 (Edge Case Handling Need)	AC4	test_capacity_zero_error_handling
+C6	Persona 2 (Inconsistency Pain Point)	AC5	test_request_idempotency_check
+C7	Persona 1 (Auto-Resolution Need)	AC6	test_priority_conflict_resolution
+
+
+
+Revision Notes
+
+
+
+
+
+
+
+
+
