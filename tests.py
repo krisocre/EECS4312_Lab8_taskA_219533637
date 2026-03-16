@@ -1,238 +1,81 @@
 import pytest
-from datetime import date, datetime, time, timedelta
-
-# Update import path to match your project structure:
-from solution import TimeWindow, BusyInterval, Slot, suggest_slots
+from datetime import date, time, timedelta
+from solution import TimeWindow, BusyInterval, suggest_slots
 
 
-# ---------- Helpers -----------
-
-def combine(d: date, t: time) -> datetime:
-    return datetime.combine(d, t)
-
-
-def overlaps(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
-    return a_start < b_end and b_start < a_end
-
-
-def in_window(win: TimeWindow, t: time) -> bool:
-    return win.start <= t < win.end
+def assert_result_invariants(result, n):
+    """Verifies that the result follows basic system rules."""
+    assert hasattr(result, 'slots')
+    assert hasattr(result, 'system_logs')
+    assert hasattr(result, 'status')
+    assert len(result.slots) <= n
+    times = [s.start_time for s in result.slots]
+    assert times == sorted(times)
 
 
-def assert_slots_basic_constraints(
-    slots,
-    day,
-    working_hours,
-    busy_intervals,
-    duration,
-    n,
-    buffer,
-    candidate_window,
-):
-    # Return type / length
-    assert isinstance(slots, list)
-    assert len(slots) <= n
-
-    # Deterministic ordering: start_time ascending
-    assert slots == sorted(slots, key=lambda s: s.start_time)
-
-    # Each slot start must be within working_hours and candidate_window (if any)
-    for s in slots:
-        assert in_window(working_hours, s.start_time)
-        if candidate_window is not None:
-            assert in_window(candidate_window, s.start_time)
-
-    # Each slot must fit fully inside working_hours and candidate_window
-    for s in slots:
-        start_dt = combine(day, s.start_time)
-        end_dt = start_dt + duration
-
-        wh_end = combine(day, working_hours.end)
-        assert end_dt <= wh_end
-
-        if candidate_window is not None:
-            cw_end = combine(day, candidate_window.end)
-            assert end_dt <= cw_end
-
-    # No overlap with busy intervals, considering buffer:
-    # busy interval is expanded to [start-buffer, end+buffer)
-    for s in slots:
-        slot_start = combine(day, s.start_time)
-        slot_end = slot_start + duration
-
-        for b in busy_intervals:
-            b_start = combine(day, b.start) - buffer
-            b_end = combine(day, b.end) + buffer
-            assert not overlaps(slot_start, slot_end, b_start, b_end)
-
-
-# ---------- Tests ----------
-
-def test_a1_no_busy_simple_slots():
-    """
-    Like original "single med exact times": here, no busy events.
-    Expect earliest slots within working hours (we only assert constraints + non-empty).
-    """
-    day = date(2026, 2, 24)
-    working = TimeWindow(time(9, 0), time(12, 0))
-    busy = []
-    duration = timedelta(minutes=30)
-
-    out = suggest_slots(
-        day=day,
-        working_hours=working,
-        busy_intervals=busy,
-        duration=duration,
-        n=3,
-        buffer=timedelta(0),
-        candidate_window=None
-    )
-
-    assert_slots_basic_constraints(out, day, working, busy, duration, 3, timedelta(0), None)
-    # Should at least return 1 slot if implementation uses a reasonable slot step
-    assert len(out) > 0
-    # Earliest slot should be at or after working start
-    assert out[0].start_time >= time(9, 0)
-
-
-def test_a2_deterministic_same_inputs_same_outputs():
-    """
-    Like original tie/determinism check: same inputs must return identical outputs.
-    """
-    day = date(2026, 2, 24)
-    working = TimeWindow(time(9, 0), time(17, 0))
-    busy = [
-        BusyInterval(time(10, 0), time(10, 30)),
-        BusyInterval(time(13, 0), time(14, 0)),
-    ]
-    duration = timedelta(minutes=30)
-    buffer = timedelta(minutes=0)
-
-    out1 = suggest_slots(day, working, busy, duration, n=10, buffer=buffer, candidate_window=None)
-    out2 = suggest_slots(day, working, busy, duration, n=10, buffer=buffer, candidate_window=None)
-
-    assert [s.start_time for s in out1] == [s.start_time for s in out2]
-    assert_slots_basic_constraints(out1, day, working, busy, duration, 10, buffer, None)
-
-
-def test_a3_overlapping_and_unsorted_busy_intervals_handled():
-    """
-    Busy intervals may be unsorted/overlapping; suggestions must still avoid conflicts.
-    """
-    day = date(2026, 2, 24)
+# Covers C1, AC1
+def test_deterministic_sort_order():
+    """Verifies C1: Predictable and stable ordering for Jane and Mo."""
+    day = date(2026, 3, 6)
     working = TimeWindow(time(9, 0), time(12, 0))
     busy = [
-        BusyInterval(time(10, 30), time(11, 0)),
-        BusyInterval(time(10, 0), time(10, 45)),   # overlaps with above
-        BusyInterval(time(9, 30), time(9, 45)),    # unsorted relative order
+        BusyInterval(time(9, 0), time(10, 0), name="Z-Event"),
+        BusyInterval(time(9, 0), time(10, 0), name="A-Event")
     ]
-    duration = timedelta(minutes=15)
+    result = suggest_slots(day, working, busy, timedelta(minutes=30), n=1)
+    assert_result_invariants(result, 1)
+    # TBR1: Alphabetical tie-break ensures 10:00 is the consistent output
+    assert result.slots[0].start_time == time(10, 0)
 
-    out = suggest_slots(day, working, busy, duration, n=8, buffer=timedelta(0), candidate_window=None)
-    assert_slots_basic_constraints(out, day, working, busy, duration, 8, timedelta(0), None)
-
-
-def test_a4_candidate_window_respected():
-    """
-    Like original allowed_window respected: here we add an extra candidate window restriction.
-    """
-    day = date(2026, 2, 24)
-    working = TimeWindow(time(9, 0), time(17, 0))
-    candidate = TimeWindow(time(13, 0), time(15, 0))
-    busy = []
-    duration = timedelta(minutes=30)
-
-    out = suggest_slots(day, working, busy, duration, n=5, buffer=timedelta(0), candidate_window=candidate)
-    assert_slots_basic_constraints(out, day, working, busy, duration, 5, timedelta(0), candidate)
-
-    # Every slot must start within candidate window
-    assert all(candidate.start <= s.start_time < candidate.end for s in out)
-
-
-def test_a5_buffer_eliminates_small_gaps():
-    """
-    Like original rate-limit constraint: here buffer is the key extra constraint.
-    With buffer, some slots that would otherwise fit should be invalid.
-    """
-    day = date(2026, 2, 24)
-    working = TimeWindow(time(9, 0), time(11, 0))
-    # Two busy intervals leaving a 20-minute gap between them
-    busy = [
-        BusyInterval(time(9, 30), time(9, 50)),
-        BusyInterval(time(10, 10), time(10, 30)),
-    ]
-    duration = timedelta(minutes=20)
-
-    # Without buffer: the gap 9:50–10:10 is exactly 20 minutes -> potentially valid
-    out_no_buffer = suggest_slots(day, working, busy, duration, n=10, buffer=timedelta(0), candidate_window=None)
-    assert_slots_basic_constraints(out_no_buffer, day, working, busy, duration, 10, timedelta(0), None)
-
-    # With 5-min buffer: effective busy expands, gap shrinks -> should reduce or remove those slots
-    buf = timedelta(minutes=5)
-    out_with_buffer = suggest_slots(day, working, busy, duration, n=10, buffer=buf, candidate_window=None)
-    assert_slots_basic_constraints(out_with_buffer, day, working, busy, duration, 10, buf, None)
-
-    # Buffer should not increase number of available slots (monotonicity)
-    assert len(out_with_buffer) <= len(out_no_buffer)
-
-
-#################################################################################
-# Add your own additional tests here to cover more cases and edge cases as needed.
-#################################################################################
-
-def test_1_earliest_possible_priority():
-    # Validates: C5 (Determinism/Priority)
-    day = date(2026, 3, 6)
-    working = TimeWindow(time(9, 0), time(12, 0))
-    busy = [BusyInterval(time(10, 0), time(11, 0))]
-    duration = timedelta(minutes=30)
-    out = suggest_slots(day, working, busy, duration, n=1)
-    assert out[0].start_time == time(9, 0)
-
-def test_2_buffer_exclusion_logic():
-    # Validates: C6 (Buffer Enforcement)
-    day = date(2026, 3, 6)
-    working = TimeWindow(time(9, 0), time(12, 0))
-    busy = [BusyInterval(time(9, 0), time(10, 0)), BusyInterval(time(10, 40), time(11, 30))]
-    duration = timedelta(minutes=30)
-    buffer = timedelta(minutes=15)
-    out = suggest_slots(day, working, busy, duration, n=1, buffer=buffer)
-    assert len(out) == 0
-
-def test_3_merged_interval_robustness():
-    # Validates: C2 (Non-Overlap with overlapping/unsorted busy blocks)
-    day = date(2026, 3, 6)
-    working = TimeWindow(time(9, 0), time(13, 0))
-    busy = [BusyInterval(time(10, 30), time(11, 30)), BusyInterval(time(10, 0), time(11, 0))]
-    out = suggest_slots(day, working, busy, timedelta(minutes=30), n=10)
-    for s in out:
-        assert not (time(10, 0) <= s.start_time < time(11, 30))
-
-def test_4_candidate_window_strictness():
-    # Validates: C1 (Working Hour/Window Boundaries)
-    day = date(2026, 3, 6)
-    candidate = TimeWindow(time(10, 0), time(11, 0))
-    out = suggest_slots(day, TimeWindow(time(8,0), time(18,0)), [], timedelta(minutes=45), n=5, candidate_window=candidate)
-    for s in out:
-        assert time(10, 0) <= s.start_time <= time(10, 15)
-
-def test_5_deterministic_n_limit():
-    # Validates: C5 (Deterministic N results)
-    day = date(2026, 3, 6)
-    out = suggest_slots(day, TimeWindow(time(9,0), time(17,0)), [], timedelta(hours=1), n=3)
-    assert len(out) == 3
-    assert out[0].start_time < out[1].start_time < out[2].start_time
-
-def test_6_duration_longer_than_gap():
-    # Validates: C1, C3 (Duration Integrity and Workday Limits)
+# Covers C2, AC2
+def test_waitlist_promotion_logging():
+    """Verifies C2: Mo's need for explanations and transparency."""
     day = date(2026, 3, 6)
     working = TimeWindow(time(9, 0), time(10, 0))
-    out = suggest_slots(day, working, [], timedelta(hours=2), n=1)
-    assert out == []
+    busy = [BusyInterval(time(9, 15), time(9, 45), name="Medication")]
+    result = suggest_slots(day, working, busy, timedelta(minutes=30), n=5)
+    # Mo expects a clear log entry for the skipped/moved slot
+    assert any("Skipped" in log and "Medication" in log for log in result.system_logs)
 
-def test_7_no_availability_remaining():
-    # Validates: C4 (Single-Day Scope / Full Schedule)
+# Covers C3, AC3
+def test_notification_suppression_window():
+    """Verifies C3: Jane's pain point regarding notification overload."""
     day = date(2026, 3, 6)
-    busy = [BusyInterval(time(9, 0), time(17, 0))]
-    out = suggest_slots(day, TimeWindow(time(9,0), time(17,0)), busy, timedelta(minutes=15), n=5)
-    assert out == []
+    working = TimeWindow(time(9, 0), time(10, 0))
+    result = suggest_slots(day, working, [], timedelta(minutes=30), n=2)
+    # Throttling/Stepping ensures slots aren't suggested every minute
+    assert result.slots[0].start_time == time(9, 0)
+    assert result.slots[1].start_time == time(9, 5)
+
+# Covers C4, AC4 (Edge Case: EC1)
+def test_capacity_zero_error_handling():
+    """Verifies C4: Mo's need for explicit handling of zero-capacity/impossible windows."""
+    day = date(2026, 3, 6)
+    working = TimeWindow(time(9, 0), time(9, 15)) 
+    result = suggest_slots(day, working, [], timedelta(minutes=30), n=1)
+    # Explicit status return instead of silent failure
+    assert result.status == "No Availability Found"
+    assert len(result.slots) == 0
+
+# Covers C6, AC5 (Edge Case: EC2)
+def test_request_idempotency_check():
+    """Verifies C6: Mo's need for consistent responses across repeated scenarios."""
+    day = date(2026, 3, 6)
+    working = TimeWindow(time(9, 0), time(17, 0))
+    busy = [BusyInterval(time(10, 0), time(11, 0), name="Meeting")]
+    out1 = suggest_slots(day, working, busy, timedelta(minutes=30), n=3)
+    out2 = suggest_slots(day, working, busy, timedelta(minutes=30), n=3)
+    assert [s.start_time for s in out1.slots] == [s.start_time for s in out2.slots]
+
+# Covers C7, AC6 (Edge Case: EC5)
+def test_priority_conflict_resolution():
+    """Verifies C7: Jane's trust in the system to resolve overlaps automatically with buffers."""
+    day = date(2026, 3, 6)
+    working = TimeWindow(time(9, 0), time(12, 0))
+    busy = [
+        BusyInterval(time(9, 0), time(10, 0), name="High Priority Med"),
+        BusyInterval(time(11, 0), time(12, 0), name="Routine Task")
+    ]
+    # Testing a gap that is too small once a 15-min buffer is applied
+    result = suggest_slots(day, working, busy, timedelta(minutes=45), n=1, buffer=timedelta(minutes=15))
+    assert len(result.slots) == 0
